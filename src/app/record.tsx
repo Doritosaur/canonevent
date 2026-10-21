@@ -1,10 +1,12 @@
-import { router } from 'expo-router';
+import { router, usePreventRemove } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { Mascot, MicProblem, RecorderPanel } from '@/components/lore';
-import { ArtBoard, IconButton, Screen, Text } from '@/components/ui';
+import { ArtBoard, ConfirmDialog, IconButton, Screen, Text } from '@/components/ui';
 import { useRecorder } from '@/hooks/useRecorder';
+import { deleteAudioFiles } from '@/lib/audioFiles';
 import { spacing, useTheme } from '@/theme';
 
 const close = () => router.dismissTo('/(tabs)');
@@ -14,8 +16,24 @@ export default function Record() {
   const { colors } = useTheme();
   const rec = useRecorder();
   const problem = rec.status === 'denied' || rec.status === 'error';
+  // Set once the user has chosen to leave, so the guard below lets the navigation through.
+  const [leaving, setLeaving] = useState(false);
+  const [blocked, setBlocked] = useState<(() => void) | null>(null);
+
+  // Covers the X, the Android back button and the iOS swipe-back: all would silently drop the take.
+  usePreventRemove(rec.status === 'recording' && !leaving, ({ repeat }) => setBlocked(() => repeat));
+
+  const discard = async () => {
+    const leave = blocked;
+    setBlocked(null);
+    setLeaving(true);
+    const result = await rec.stop();
+    deleteAudioFiles([result.uri]);
+    leave?.();
+  };
 
   const stop = async () => {
+    setLeaving(true);
     const result = await rec.stop();
     router.replace({
       pathname: '/processing',
@@ -70,6 +88,16 @@ export default function Record() {
           </View>
         </>
       )}
+
+      <ConfirmDialog
+        visible={blocked !== null}
+        title="Discard recording?"
+        message="What you’ve recorded so far will be lost."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={discard}
+        onCancel={() => setBlocked(null)}
+      />
     </Screen>
   );
 }

@@ -53,7 +53,13 @@ export default function Onboarding() {
     router.replace('/(tabs)');
   };
 
-  const onSettle = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+  const goTo = (next: number) => {
+    if (next < 0 || next >= SLIDES.length) return;
+    list.current?.scrollToIndex({ index: next, animated: true });
+    setIndex(next);
+  };
+
+  const onSettle =(e: NativeSyntheticEvent<NativeScrollEvent>) =>
     setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
 
   return (
@@ -105,10 +111,15 @@ export default function Onboarding() {
         <Text variant="body" color="textMuted" style={styles.hint}>
           Just speak. We&rsquo;ll handle the rest.
         </Text>
+        {/* Swiping is the only other way to change page, so expose it as an adjustable control. */}
         <View
           style={styles.dots}
           accessible
-          accessibilityLabel={`Page ${index + 1} of ${SLIDES.length}`}>
+          accessibilityRole="adjustable"
+          accessibilityLabel="Intro pages"
+          accessibilityValue={{ text: `Page ${index + 1} of ${SLIDES.length}` }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) => goTo(index + (e.nativeEvent.actionName === 'increment' ? 1 : -1))}>
           {SLIDES.map((s, i) => (
             <View key={s.key} style={[styles.dot, i === index && styles.dotActive]} />
           ))}

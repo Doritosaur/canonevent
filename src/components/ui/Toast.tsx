@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { darkPalette, type Palette, radius, spacing, useTheme } from '@/theme';
@@ -37,6 +37,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (options: ToastOptions) => {
       if (timer.current) clearTimeout(timer.current);
       setToast(options);
+      // `accessibilityLiveRegion` is Android-only; this makes VoiceOver read the message too.
+      AccessibilityInfo.announceForAccessibility(options.message);
       Animated.timing(progress, { toValue: 1, duration: 220, useNativeDriver: true }).start();
       timer.current = setTimeout(hide, options.duration ?? 4500);
     },

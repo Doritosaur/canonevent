@@ -14,13 +14,24 @@ export type RecordButtonProps = {
   onPressIn?: () => void;
   onPressOut?: () => void;
   size?: number;
+  /** Overrides the default "Start recording" / "Stop recording" name. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
 const RING = 3;
 const GAP = 7;
 
 /** Cyan disc inside a thin ring with a soft glow; the ring pulses outwards while recording. */
-export function RecordButton({ recording = false, onPress, onPressIn, onPressOut, size = 120 }: RecordButtonProps) {
+export function RecordButton({
+  recording = false,
+  onPress,
+  onPressIn,
+  onPressOut,
+  size = 120,
+  accessibilityLabel,
+  accessibilityHint,
+}: RecordButtonProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const inner = size - 2 * (RING + GAP);
@@ -63,7 +74,9 @@ export function RecordButton({ recording = false, onPress, onPressIn, onPressOut
       )}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={recording ? 'Stop recording' : 'Start recording'}
+        accessibilityLabel={accessibilityLabel ?? (recording ? 'Stop recording' : 'Start recording')}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{ busy: recording }}
         onPress={() => {
           buzz();
           onPress?.();

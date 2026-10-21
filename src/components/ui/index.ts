@@ -3,6 +3,7 @@ export * from './ArtBoard';
 export * from './Button';
 export * from './Card';
 export * from './Chip';
+export * from './ConfirmDialog';
 export * from './Glow';
 export * from './Icon';
 export * from './IconButton';

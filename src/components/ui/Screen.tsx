@@ -26,6 +26,7 @@ export function Screen({ scroll = false, hasTabBar = false, style, children, ...
         style={styles.root}
         contentContainerStyle={[styles.content, padding, style]}
         contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled">
         {children}

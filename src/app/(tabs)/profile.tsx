@@ -1,11 +1,10 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Card, Glow, Screen, SegmentedControl, SettingsRow, Text, useToast } from '@/components/ui';
+import { Card, ConfirmDialog, Glow, Screen, SegmentedControl, SettingsRow, Text, useToast } from '@/components/ui';
 import { initials, USER } from '@/data/profile';
 import { deleteAudioFiles } from '@/lib/audioFiles';
-import { confirm } from '@/lib/confirm';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, type ThemePreference, useTheme } from '@/theme';
 
@@ -25,21 +24,18 @@ export default function Profile() {
   const lessons = entries.filter((e) => e.learned.trim() !== '').length;
   const updates = entries.reduce((n, e) => n + e.updates.length, 0);
 
-  const onDelete = async () => {
-    const ok = await confirm(
-      'Delete all data?',
-      'This permanently removes every entry and recording from this device. It can’t be undone.',
-      'Delete everything',
-    );
-    if (!ok) return;
+  const [dialog, setDialog] = useState<'delete' | 'logout' | null>(null);
+  const closeDialog = () => setDialog(null);
+
+  const onDelete = () => {
+    closeDialog();
     deleteAudioFiles(entries.map((e) => e.audioUri));
     deleteAllData();
     toast.show({ message: 'All your data was deleted' });
   };
 
-  const onLogout = async () => {
-    const ok = await confirm('Log out?', 'Your lore stays on this device. You’ll go back to the welcome screen.', 'Log out');
-    if (!ok) return;
+  const onLogout = () => {
+    closeDialog();
     logout();
     router.replace('/onboarding');
   };
@@ -92,14 +88,32 @@ export default function Profile() {
           label="Delete all data"
           hint="Removes every entry and recording from this device"
           destructive
-          onPress={onDelete}
+          onPress={() => setDialog('delete')}
         />
       </Card>
 
       <SectionLabel>Account</SectionLabel>
       <Card style={styles.group}>
-        <SettingsRow icon="logout" label="Log out" hint="Return to the welcome screen" chevron onPress={onLogout} />
+        <SettingsRow icon="logout" label="Log out" hint="Return to the welcome screen" chevron onPress={() => setDialog('logout')} />
       </Card>
+
+      <ConfirmDialog
+        visible={dialog === 'delete'}
+        title="Delete all data?"
+        message="This permanently removes every entry and recording from this device. It can’t be undone."
+        confirmLabel="Delete everything"
+        destructive
+        onConfirm={onDelete}
+        onCancel={closeDialog}
+      />
+      <ConfirmDialog
+        visible={dialog === 'logout'}
+        title="Log out?"
+        message="Your lore stays on this device. You’ll go back to the welcome screen."
+        confirmLabel="Log out"
+        onConfirm={onLogout}
+        onCancel={closeDialog}
+      />
     </Screen>
   );
 }

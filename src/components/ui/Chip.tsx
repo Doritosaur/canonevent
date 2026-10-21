@@ -25,6 +25,7 @@ export function Chip({ label, selected = false, teal = false, onPress, style, ..
         styles.base,
         teal && styles.teal,
         selected && styles.selected,
+        onPress && styles.tappable,
         typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}>
@@ -45,5 +46,7 @@ const makeStyles = (colors: Palette) =>
     backgroundColor: colors.chip,
   },
   teal: { backgroundColor: colors.chipTeal },
+  /** Touch targets should be at least 44pt. */
+  tappable: { minHeight: 44 },
   selected: { backgroundColor: colors.accent },
 });

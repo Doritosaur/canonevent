@@ -27,8 +27,12 @@ export function ActionSheet({ visible, title, actions, onClose }: ActionSheetPro
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable accessibilityLabel="Close menu" style={styles.backdrop} onPress={onClose}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+      {/* The backdrop must not be an accessible element, or screen readers treat the sheet as part of it. */}
+      <Pressable accessible={false} style={styles.backdrop} onPress={onClose}>
+        <View
+          accessibilityViewIsModal
+          onAccessibilityEscape={onClose}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
           {/* Absorb taps so only the backdrop closes the sheet. */}
           <Pressable accessible={false}>
             <View style={styles.grabber} />

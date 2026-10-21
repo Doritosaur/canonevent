@@ -35,7 +35,8 @@
     "scheme": "canonevent",
     "backgroundColor": "#05090B",
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     }
   }
 }

@@ -1,9 +1,9 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, usePreventRemove } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { SummarySection } from '@/components/lore';
-import { Button, Card, Chip, Icon, IconButton, Screen, Text } from '@/components/ui';
+import { Button, Card, Chip, ConfirmDialog, IconButton, Screen, Text } from '@/components/ui';
 import type { Draft } from '@/data/types';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
@@ -14,7 +14,15 @@ export default function Review() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { draft, setDraft, addEntry } = useLore();
   const [fields, setFields] = useState<Draft | null>(draft);
-  const [editing, setEditing] = useState(false);
+  const [blocked, setBlocked] = useState<(() => void) | null>(null);
+
+  const dirty =
+    !!fields &&
+    !!draft &&
+    (fields.happened !== draft.happened || fields.thinking !== draft.thinking || fields.learned !== draft.learned);
+
+  // Covers the X, the Android back button and the iOS swipe-back: all would silently drop the edits.
+  const allowLeaving = usePreventRemove(dirty, ({ repeat }) => setBlocked(() => repeat));
 
   if (!fields) return <Redirect href="/(tabs)" />;
 
@@ -23,33 +31,36 @@ export default function Review() {
 
   const save = () => {
     const entry = addEntry(fields);
+    allowLeaving();
     router.replace({ pathname: '/saved', params: { id: entry.id } });
   };
 
   const discard = () => {
-    setDraft(null);
+    if (!dirty) setDraft(null);
     router.dismissTo('/(tabs)');
+  };
+
+  const confirmDiscard = () => {
+    const leave = blocked;
+    setBlocked(null);
+    setDraft(null);
+    allowLeaving();
+    leave?.();
   };
 
   return (
     <Screen scroll style={styles.content}>
       <IconButton icon="close" label="Discard and close" size={30} onPress={discard} />
 
-      <View style={styles.titleRow}>
-        <Text variant="hand" style={styles.title} accessibilityRole="header">
-          Here&rsquo;s{' '}
-          <Text variant="hand" color="accent">
-            what I got
-          </Text>
+      <Text variant="hand" style={styles.title} accessibilityRole="header">
+        Here&rsquo;s{' '}
+        <Text variant="hand" color="accent">
+          what I got
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setEditing((e) => !e)}
-          style={({ pressed }) => [styles.edit, pressed && styles.editPressed]}>
-          <Icon name={editing ? 'check' : 'edit'} size={18} color={colors.accent} />
-          <Text variant="bodyStrong">{editing ? 'Done' : 'Edit'}</Text>
-        </Pressable>
-      </View>
+      </Text>
+      <Text variant="caption" color="textMuted" style={styles.hint}>
+        Tap any answer to fix it.
+      </Text>
 
       <View style={styles.cards}>
         <Card style={styles.card}>
@@ -58,7 +69,7 @@ export default function Review() {
             body={fields.happened}
             icon="dollar"
             tint="success"
-            onChangeBody={editing ? set('happened') : undefined}
+            onChangeBody={set('happened')}
           />
         </Card>
         <Card style={styles.card}>
@@ -67,7 +78,7 @@ export default function Review() {
             body={fields.thinking}
             icon="chat"
             tint="purple"
-            onChangeBody={editing ? set('thinking') : undefined}
+            onChangeBody={set('thinking')}
           />
         </Card>
         <Card style={styles.card}>
@@ -76,7 +87,7 @@ export default function Review() {
             body={fields.learned}
             icon="bulb"
             tint="warning"
-            onChangeBody={editing ? set('learned') : undefined}
+            onChangeBody={set('learned')}
           />
         </Card>
       </View>
@@ -88,9 +99,19 @@ export default function Review() {
       </View>
 
       <View style={styles.actions}>
-        <Button label="Save to lore" icon="arrow-right" onPress={save} disabled={editing} />
+        <Button label="Save to lore" icon="arrow-right" onPress={save} />
         <Button label="Discard" variant="secondary" onPress={discard} style={styles.discard} />
       </View>
+
+      <ConfirmDialog
+        visible={blocked !== null}
+        title="Discard changes?"
+        message="Your edits to this summary will be lost."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={confirmDiscard}
+        onCancel={() => setBlocked(null)}
+      />
     </Screen>
   );
 }
@@ -98,20 +119,8 @@ export default function Review() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   content: { paddingHorizontal: 18, paddingBottom: spacing.xxl },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
-  title: { fontSize: 37, lineHeight: 42, flex: 1 },
-  edit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 42,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  editPressed: { backgroundColor: colors.surfaceRaised },
+  title: { fontSize: 37, lineHeight: 42, marginTop: spacing.sm },
+  hint: { marginTop: spacing.xs },
   cards: { gap: 5, marginTop: spacing.lg },
   card: { borderRadius: radius.cardSm, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg },

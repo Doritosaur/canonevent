@@ -5,7 +5,7 @@ import { type Palette, radius, spacing, useTheme } from '@/theme';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'light';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'light' | 'danger';
 
 export type ButtonProps = Omit<PressableProps, 'children'> & {
   label: string;
@@ -27,7 +27,7 @@ export function Button({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isPrimary = variant === 'primary';
   const inactive = disabled === true || loading;
-  const fg = isPrimary ? colors.onAccent : variant === 'light' ? colors.onInverse : colors.text;
+  const fg = isPrimary ? colors.onAccent : variant === 'light' ? colors.onInverse : variant === 'danger' ? '#FFFFFF' : colors.text;
 
   return (
     <Pressable
@@ -70,6 +70,7 @@ const makeStyles = (colors: Palette) =>
   primary: { backgroundColor: colors.accent },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
   ghost: { backgroundColor: 'transparent' },
+  danger: { backgroundColor: colors.danger },
   light: { backgroundColor: colors.inverse },
   primaryPressed: { backgroundColor: colors.accentPressed },
   lightPressed: { backgroundColor: colors.inversePressed },
