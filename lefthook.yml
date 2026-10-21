@@ -1,0 +1,10 @@
+# https://lefthook.dev/configuration/
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: '*.{ts,tsx,js}'
+      run: npx eslint --max-warnings=0 {staged_files}
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: npx tsc --noEmit

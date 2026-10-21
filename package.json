@@ -1,22 +1,48 @@
 {
   "name": "canonevent",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/patrick-hand": "^0.4.1",
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~58.0.16",
+    "expo-audio": "~58.0.9",
+    "expo-constants": "~58.0.12",
+    "expo-file-system": "~58.0.10",
+    "expo-font": "~58.0.9",
+    "expo-haptics": "~58.0.7",
+    "expo-linking": "~58.0.13",
+    "expo-router": "~58.0.24",
+    "expo-splash-screen": "~58.0.10",
     "expo-status-bar": "~58.0.3",
+    "lucide-react-native": "^1.60.0",
     "react": "19.3.0",
-    "react-native": "0.88.0"
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "^0.21.4",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
+    "lefthook": "^2.2.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "prepare": "lefthook install"
   },
   "private": true
 }
