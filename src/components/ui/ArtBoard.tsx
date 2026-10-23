@@ -17,7 +17,7 @@ export type ArtBoardProps = {
 };
 
 /**
- * Hand-placed artwork (headlines, arrows, mascots) that stays in proportion on any screen.
+ * Hand-placed artwork (headlines, arrows, doodles) that stays in proportion on any screen.
  * It composes children at a fixed design size, then scales the whole board to the space it is given,
  * so absolute offsets never collide on small phones or drift apart on large ones.
  */

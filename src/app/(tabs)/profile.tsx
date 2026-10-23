@@ -2,9 +2,8 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Card, ConfirmDialog, Glow, Screen, SegmentedControl, SettingsRow, Text, useToast } from '@/components/ui';
-import { initials, USER } from '@/data/profile';
-import { deleteAudioFiles } from '@/lib/audioFiles';
+import { Avatar, Button, Card, ConfirmDialog, Glow, Screen, SegmentedControl, SettingsRow, Text, useToast } from '@/components/ui';
+import { signOutOfGoogle } from '@/lib/googleAuth';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, type ThemePreference, useTheme } from '@/theme';
 
@@ -18,7 +17,8 @@ const toLabel = (p: ThemePreference): ThemeLabel => (p.charAt(0).toUpperCase() +
 export default function Profile() {
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { entries, logout, deleteAllData } = useLore();
+  const { entries, profile, logout, deleteAllData, flushOutbox } = useLore();
+  const name = profile?.name ?? '';
   const toast = useToast();
 
   const lessons = entries.filter((e) => e.learned.trim() !== '').length;
@@ -29,15 +29,22 @@ export default function Profile() {
 
   const onDelete = () => {
     closeDialog();
-    deleteAudioFiles(entries.map((e) => e.audioUri));
-    deleteAllData();
-    toast.show({ message: 'All your data was deleted' });
+    deleteAllData().then(
+      () => toast.show({ message: 'All your data was deleted' }),
+      () => toast.show({ message: 'Couldn’t delete your data. Check your connection and try again.' }),
+    );
   };
 
   const onLogout = () => {
     closeDialog();
-    logout();
-    router.replace('/onboarding');
+    // Best effort: upload anything still waiting so signing out doesn't drop it.
+    void flushOutbox()
+      .catch(() => {})
+      .finally(() => {
+        signOutOfGoogle();
+        logout();
+        router.replace('/onboarding');
+      });
   };
 
   return (
@@ -45,15 +52,21 @@ export default function Profile() {
       <View style={styles.hero}>
         <View style={styles.avatarWrap}>
           <Glow size={190} opacity={0.35} style={styles.avatarGlow} />
-          <View style={styles.avatar} accessibilityLabel={`${USER.name}'s avatar`}>
-            <Text variant="title" color="onAccent" style={styles.initials}>
-              {initials(USER.name)}
-            </Text>
-          </View>
+          <Avatar name={name} uri={profile?.photoUri} size={96} />
         </View>
         <Text variant="title" accessibilityRole="header">
-          {USER.name}
+          {name}
         </Text>
+        <Text variant="caption" color="textMuted">
+          {profile?.email}
+        </Text>
+        <Button
+          label="Edit profile"
+          variant="secondary"
+          icon="edit"
+          onPress={() => router.push('/edit-profile')}
+          style={styles.editButton}
+        />
       </View>
 
       <Card style={styles.stats}>
@@ -86,7 +99,7 @@ export default function Profile() {
         <SettingsRow
           icon="trash"
           label="Delete all data"
-          hint="Removes every entry and recording from this device"
+          hint="Removes every entry, recording and question from your account"
           destructive
           onPress={() => setDialog('delete')}
         />
@@ -100,7 +113,7 @@ export default function Profile() {
       <ConfirmDialog
         visible={dialog === 'delete'}
         title="Delete all data?"
-        message="This permanently removes every entry and recording from this device. It can’t be undone."
+        message="This permanently removes every entry, recording and question from your account and this device. It can’t be undone."
         confirmLabel="Delete everything"
         destructive
         onConfirm={onDelete}
@@ -109,7 +122,7 @@ export default function Profile() {
       <ConfirmDialog
         visible={dialog === 'logout'}
         title="Log out?"
-        message="Your lore stays on this device. You’ll go back to the welcome screen."
+        message="Your lore stays safe in your account. You’ll go back to the welcome screen."
         confirmLabel="Log out"
         onConfirm={onLogout}
         onCancel={closeDialog}
@@ -131,10 +144,12 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStatStyles(), []);
   return (
     <View style={styles.stat} accessible accessibilityLabel={`${value} ${label}`}>
-      <Text variant="title" color="accent">
+      {/* The exact brand cyan in both themes. Text's `accent` colour darkens to a teal on light backgrounds. */}
+      <Text variant="title" style={{ color: colors.accent }}>
         {value}
       </Text>
       <Text variant="caption" color="textMuted">
@@ -152,15 +167,7 @@ const makeStyles = (colors: Palette) =>
     hero: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.lg, marginBottom: spacing.sm },
     avatarWrap: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
     avatarGlow: { left: -47, top: -47 },
-    avatar: {
-      width: 96,
-      height: 96,
-      borderRadius: 48,
-      backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    initials: { fontSize: 34, lineHeight: 40, letterSpacing: 1 },
+    editButton: { minHeight: 44, marginTop: spacing.md },
     stats: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.lg, borderRadius: radius.card },
     divider: { width: 1, height: 36, backgroundColor: colors.border },
     group: { padding: 0, borderRadius: radius.card, overflow: 'hidden' },

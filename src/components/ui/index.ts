@@ -1,5 +1,6 @@
 export * from './ActionSheet';
 export * from './ArtBoard';
+export * from './Avatar';
 export * from './Button';
 export * from './Card';
 export * from './Chip';

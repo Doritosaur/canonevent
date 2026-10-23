@@ -1,43 +1,21 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { InsightCard, type InsightCardProps } from '@/components/lore';
+import { InsightCard, type InsightTone } from '@/components/lore';
 import { Card, Screen, SegmentedControl, Text } from '@/components/ui';
-import { CATEGORIES, categoryMeta } from '@/data/types';
-import { monthsSpan } from '@/lib/format';
+import { CATEGORIES, categoryMeta, type Outcome } from '@/data/types';
+import { formatDate, monthsSpan } from '@/lib/format';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
 
 const TABS = ['Highlights', 'Categories', 'Trends'] as const;
 type Tab = (typeof TABS)[number];
 
-/** Static until a real pattern-detection backend exists. */
-const HIGHLIGHTS: InsightCardProps[] = [
-  {
-    text: 'You tend to buy tools before validating if you actually need them.',
-    meta: '7 similar decisions',
-    tone: 'danger',
-    icon: 'cart',
-  },
-  {
-    text: 'You underestimate how much time side projects require.',
-    meta: '5 similar decisions',
-    tone: 'purple',
-    icon: 'clock',
-  },
-  {
-    text: 'You often abandon projects when the initial excitement disappears.',
-    meta: '6 similar decisions',
-    tone: 'info',
-    icon: 'trend',
-  },
-  {
-    text: 'You make better decisions when you set a budget beforehand.',
-    meta: '4 similar decisions',
-    tone: 'success',
-    icon: 'people',
-  },
-];
+const TONE_BY_OUTCOME: Record<Outcome, InsightTone> = { bad: 'danger', mixed: 'info', good: 'success' };
+
+/** How many pattern notes the Highlights tab lists. */
+const MAX_HIGHLIGHTS = 8;
 
 const MONTHS_SHOWN = 6;
 
@@ -47,6 +25,12 @@ export default function Insights() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { entries } = useLore();
   const [tab, setTab] = useState<Tab>('Highlights');
+
+  // The pattern each memory was analysed for, most recent first (entries are already newest first).
+  const highlights = useMemo(
+    () => entries.filter((e) => e.analysis.trim() !== '').slice(0, MAX_HIGHLIGHTS),
+    [entries],
+  );
 
   const byCategory = useMemo(
     () => CATEGORIES.map((c) => ({ category: c, count: entries.filter((e) => e.category === c).length })),
@@ -80,7 +64,22 @@ export default function Insights() {
 
       <SegmentedControl options={TABS} value={tab} onChange={setTab} />
 
-      {tab === 'Highlights' && HIGHLIGHTS.map((h) => <InsightCard key={h.text} {...h} />)}
+      {tab === 'Highlights' && highlights.length === 0 && (
+        <Card>
+          <Text color="textMuted">Patterns in how you decide will show up here as you record more.</Text>
+        </Card>
+      )}
+      {tab === 'Highlights' &&
+        highlights.map((e) => (
+          <InsightCard
+            key={e.id}
+            text={e.analysis}
+            meta={`${e.title} · ${formatDate(e.date)}`}
+            tone={TONE_BY_OUTCOME[e.outcome]}
+            icon={categoryMeta[e.category].icon}
+            onPress={() => router.push({ pathname: '/entry/[id]', params: { id: e.id } })}
+          />
+        ))}
 
       {tab === 'Categories' && (
         <Card style={styles.bars}>

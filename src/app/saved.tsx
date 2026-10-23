@@ -2,7 +2,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
-import { EntryTile, Mascot, Sparkle } from '@/components/lore';
+import { EntryTile, Sparkle } from '@/components/lore';
 import { ArtBoard, Button, Card, Screen, Text } from '@/components/ui';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { formatDate } from '@/lib/format';
@@ -58,7 +58,6 @@ export default function Saved() {
               ],
             },
           ]}>
-          <Mascot pose="celebrate" width={340} />
           {CONFETTI.map((c, i) => (
             <View key={`${c.x}-${c.y}`} style={[styles.confetti, { left: c.x, top: c.y }]}>
               <Sparkle size={c.size} twinkle delay={i * 260} />

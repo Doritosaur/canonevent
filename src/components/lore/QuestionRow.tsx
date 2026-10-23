@@ -7,16 +7,18 @@ import { type Palette, radius, spacing, useTheme } from '@/theme';
 export type QuestionRowProps = {
   question: string;
   onPress?: () => void;
+  onLongPress?: () => void;
 };
 
-/** Suggested prompt for "Ask your past self". */
-export function QuestionRow({ question, onPress }: QuestionRowProps) {
+/** A question asked before, shown in the recent list on "Ask your past self". */
+export function QuestionRow({ question, onPress, onLongPress }: QuestionRowProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <Text variant="body" color="textSoft" numberOfLines={1} style={styles.text}>
         {question}

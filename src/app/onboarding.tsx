@@ -1,19 +1,33 @@
+import { Image, type ImageSource } from 'expo-image';
 import { Redirect, router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Pressable,
   StyleSheet,
   useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 
-import { Mascot, Sparkle } from '@/components/lore';
-import { ArtBoard, Button, Screen, Text } from '@/components/ui';
+import { ProfileEditor, Sparkle } from '@/components/lore';
+import { Button, Screen, Text } from '@/components/ui';
+import { signInWithGoogle } from '@/lib/googleAuth';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
+
+const ART: Record<'welcome' | 'speak' | 'ask', ImageSource> = {
+  welcome: require('../../assets/illustrations/image-1.png') as ImageSource,
+  speak: require('../../assets/illustrations/image-2.png') as ImageSource,
+  ask: require('../../assets/illustrations/image-3.png') as ImageSource,
+};
+
+const ASIDE: Record<'welcome' | 'speak' | 'ask', string> = {
+  welcome: 'same\nmistakes\nnew\nlore.',
+  speak: 'ramble\nit’s fine.',
+  ask: 'what would\npast you say?',
+};
 
 const SLIDES = [
   {
@@ -34,24 +48,58 @@ const SLIDES = [
 ] as const;
 
 
-/** Screen 1: Onboarding. A short, swipeable intro; every page can jump straight in. */
+/** Screen 1: Onboarding. A short, swipeable intro with Google sign-in, then name and photo setup. */
 export default function Onboarding() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { hasOnboarded, completeOnboarding } = useLore();
+  const { hasOnboarded, profile, setProfile, completeOnboarding } = useLore();
   const { width, height } = useWindowDimensions();
   /** 1 on a normal phone, smaller on compact screens so the copy and button always fit. */
   const k = Math.min(1, width / 390, height / 780);
   const [index, setIndex] = useState(0);
   const [pagerHeight, setPagerHeight] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<(typeof SLIDES)[number]>>(null);
 
   if (hasOnboarded) return <Redirect href="/(tabs)" />;
 
-  const start = () => {
-    completeOnboarding();
-    router.replace('/(tabs)');
+  const signIn = async () => {
+    setLoading(true);
+    setError(null);
+    const result = await signInWithGoogle();
+    setLoading(false);
+    if (result.status === 'ok') setProfile(result.profile);
+    else if (result.status === 'error') setError(result.message);
   };
+
+  // Signed in but not finished: survives the app being closed mid-setup.
+  if (profile) {
+    return (
+      <Screen scroll style={styles.setup}>
+        <View style={styles.setupHeader}>
+          <Text variant="display" style={styles.setupTitle} accessibilityRole="header">
+            Set up your{' '}
+            <Text variant="display" color="accent" style={styles.setupTitle}>
+              profile
+            </Text>
+          </Text>
+          <Text variant="body" color="textSoft" style={styles.setupSubtitle}>
+            Add a photo and tell us what to call you. You can change these any time.
+          </Text>
+        </View>
+        <ProfileEditor
+          initial={profile}
+          submitLabel="Continue"
+          onSubmit={(p) => {
+            setProfile(p);
+            completeOnboarding();
+            router.replace('/(tabs)');
+          }}
+        />
+      </Screen>
+    );
+  }
 
   const goTo = (next: number) => {
     if (next < 0 || next >= SLIDES.length) return;
@@ -59,8 +107,11 @@ export default function Onboarding() {
     setIndex(next);
   };
 
-  const onSettle =(e: NativeSyntheticEvent<NativeScrollEvent>) =>
-    setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
+  // Track the page live while dragging; momentum-end alone doesn't fire on every drag release.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = Math.min(SLIDES.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width)));
+    setIndex((prev) => (prev === next ? prev : next));
+  };
 
   return (
     <Screen style={styles.screen}>
@@ -71,12 +122,14 @@ export default function Onboarding() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onSettle}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         style={styles.pager}
-        renderItem={({ item, index: i }) => (
+        renderItem={({ item }) => (
           <View style={{ width, height: pagerHeight }}>
-            <View style={styles.art}>{i === 0 ? <WelcomeArt /> : <SecondaryArt slide={i} />}</View>
+            <View style={styles.art}><SlideArt slide={item.key} /></View>
             <View style={styles.copy}>
               <Text
                 variant="display"
@@ -103,11 +156,17 @@ export default function Onboarding() {
 
       <View style={styles.footer}>
         <Button
-          label="Get started"
+          label="Continue with Google"
           icon="arrow-right"
-          onPress={start}
+          loading={loading}
+          onPress={signIn}
           style={[styles.button, { minHeight: Math.max(52, Math.round(66 * k)), marginTop: Math.round(spacing.xl * k) }]}
         />
+        {error && (
+          <Text variant="caption" color="danger" style={styles.error} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        )}
         <Text variant="body" color="textMuted" style={styles.hint}>
           Just speak. We&rsquo;ll handle the rest.
         </Text>
@@ -121,7 +180,7 @@ export default function Onboarding() {
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(e) => goTo(index + (e.nativeEvent.actionName === 'increment' ? 1 : -1))}>
           {SLIDES.map((s, i) => (
-            <View key={s.key} style={[styles.dot, i === index && styles.dotActive]} />
+            <Pressable key={s.key} hitSlop={10} onPress={() => goTo(i)} style={[styles.dot, i === index && styles.dotActive]} />
           ))}
         </View>
       </View>
@@ -129,59 +188,35 @@ export default function Onboarding() {
   );
 }
 
-/** The mockup's first page: tagline, arrow, crawling mascot and doodles. */
-function WelcomeArt() {
+/** One illustration per slide, with a twinkling sparkle. */
+function SlideArt({ slide }: { slide: (typeof SLIDES)[number]['key'] }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width, height } = useWindowDimensions();
+  /** Same shrink factor as the screen copy, so art and text scale down together on small phones. */
+  const k = Math.min(1, width / 390, height / 780);
   return (
-    <ArtBoard designWidth={390} designHeight={420} mode="fit" maxScale={1.1}>
-      <Text variant="handLg" style={styles.tagline}>
-        same{'\n'}mistakes{'\n'}new{'\n'}lore.
+    <View style={styles.artWrap}>
+      <Image
+        source={ART[slide]}
+        style={[styles.artImage, { maxWidth: Math.round(230 * k), maxHeight: Math.round(200 * k), marginTop: Math.round(30 * k) }]}
+        contentFit="contain"
+        accessible={false}
+      />
+      <Text
+        variant="handLg"
+        color={slide === 'welcome' ? undefined : 'accent'}
+        style={[
+          styles.aside,
+          { top: Math.round(36 * k), left: Math.round(28 * k), fontSize: Math.round(40 * k), lineHeight: Math.round(42 * k) },
+        ]}
+        pointerEvents="none">
+        {ASIDE[slide]}
       </Text>
-
-      <Svg width={44} height={40} viewBox="0 0 44 40" style={styles.arrow}>
-        <Path
-          d="M4 4 C 8 18, 22 28, 36 32 M36 32 L26 33 M36 32 L32 22"
-          stroke={colors.sketch}
-          strokeWidth={2.2}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-
-      <View style={styles.cross}>
-        <Svg width={32} height={32} viewBox="0 0 32 32">
-          <Path d="M3 3 L29 29 M29 3 L3 29" stroke={colors.sketchDim} strokeWidth={2.2} strokeLinecap="round" />
-        </Svg>
-      </View>
-
-      <View style={styles.mascot}>
-        <Mascot pose="crawl" width={210} />
-      </View>
       <View style={styles.sparkle}>
-        <Sparkle size={16} twinkle />
+        <Sparkle size={20} twinkle />
       </View>
-    </ArtBoard>
-  );
-}
-
-function SecondaryArt({ slide }: { slide: number }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const speak = slide === 1;
-  return (
-    <ArtBoard designWidth={390} designHeight={420} mode="fit" maxScale={1.1}>
-      <Text variant="handLg" color="accent" style={styles.aside}>
-        {speak ? 'ramble\nit’s fine.' : 'what would\npast you say?'}
-      </Text>
-      <View style={styles.centerMascot}>
-        <Mascot pose={speak ? 'laptop' : 'think'} width={speak ? 250 : 170} />
-      </View>
-      <View style={[styles.sparkle, { right: 70, bottom: 150 }]}>
-        <Sparkle size={22} twinkle />
-      </View>
-    </ArtBoard>
+    </View>
   );
 }
 
@@ -189,21 +224,22 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   screen: { paddingHorizontal: 0 },
   pager: { flex: 1 },
-  art: { flex: 1, minHeight: 200 },
+  art: { flex: 1, minHeight: 0, overflow: 'hidden' },
   copy: { alignItems: 'center', paddingHorizontal: 22, paddingTop: spacing.sm },
   subtitle: { textAlign: 'center', marginTop: spacing.xs },
   footer: { paddingHorizontal: 22, alignItems: 'center', paddingBottom: spacing.sm },
   button: { alignSelf: 'stretch', borderRadius: radius.button },
+  error: { textAlign: 'center', marginTop: spacing.md },
+  setup: { paddingHorizontal: 22, gap: spacing.xl },
+  setupHeader: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.xl },
+  setupTitle: { fontSize: 48, lineHeight: 54, textAlign: 'center' },
+  setupSubtitle: { textAlign: 'center', fontSize: 18, lineHeight: 26 },
   hint: { fontSize: 16, marginTop: spacing.lg },
   dots: { flexDirection: 'row', gap: 15, marginTop: spacing.xl },
   dot: { width: 7, height: 7, borderRadius: radius.pill, backgroundColor: colors.dot },
   dotActive: { backgroundColor: colors.accent },
-
-  tagline: { position: 'absolute', left: 34, top: 24, fontSize: 50, lineHeight: 50, transform: [{ rotate: '-10deg' }] },
-  arrow: { position: 'absolute', left: 150, top: 208 },
-  cross: { position: 'absolute', left: 28, top: 296 },
-  mascot: { position: 'absolute', left: 90, top: 150 },
-  sparkle: { position: 'absolute', left: 332, top: 300 },
-  aside: { position: 'absolute', left: 40, top: 40, fontSize: 52, lineHeight: 54, transform: [{ rotate: '-8deg' }] },
-  centerMascot: { position: 'absolute', left: 0, right: 0, top: 130, alignItems: 'center' },
+  artWrap: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  artImage: { flex: 1, minHeight: 0, width: '100%', maxWidth: 280, maxHeight: 240, alignSelf: 'center' },
+  sparkle: { position: 'absolute', right: 44, bottom: 24 },
+  aside: { position: 'absolute', left: 28, top: 36, fontSize: 40, lineHeight: 42, transform: [{ rotate: '-8deg' }] },
 });

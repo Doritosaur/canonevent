@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#05090B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -30,7 +30,9 @@
         {
           "microphonePermission": "Canon Event uses the microphone to record your voice entries."
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-image"
     ],
     "scheme": "canonevent",
     "backgroundColor": "#05090B",

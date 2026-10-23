@@ -15,6 +15,7 @@ import {
   useToast,
 } from '@/components/ui';
 import { formatDate } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
 
@@ -51,7 +52,7 @@ export default function EntryDetail() {
   return (
     <Screen scroll style={styles.content}>
       <ScreenHeader
-        left={{ icon: 'back', label: 'Back', onPress: () => router.back() }}
+        left={{ icon: 'back', label: 'Back', onPress: () => goBack() }}
         right={{ icon: 'more', label: 'More actions', onPress: () => setMenuOpen(true) }}
       />
 
@@ -67,7 +68,7 @@ export default function EntryDetail() {
         </View>
       </View>
 
-      <AudioBar durationSec={entry.durationSec} uri={entry.audioUri} />
+      <AudioBar durationSec={entry.durationSec} uri={entry.audioUri} memoryId={entry.id} audioStored={entry.audioStored} />
 
       <SegmentedControl options={TABS} value={tab} onChange={setTab} />
 

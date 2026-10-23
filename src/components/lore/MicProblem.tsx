@@ -2,7 +2,6 @@ import { Linking, Platform, StyleSheet, View } from 'react-native';
 
 import { Button, Text } from '@/components/ui';
 import { spacing } from '@/theme';
-import { Mascot } from './Mascot';
 
 export type MicProblemProps = {
   /** `denied`: the user said no. `error`: the microphone could not start. */
@@ -20,7 +19,6 @@ export function MicProblem({ kind, canAskAgain, onRetry, onClose }: MicProblemPr
 
   return (
     <View style={styles.wrap} accessibilityLiveRegion="polite">
-      <Mascot pose="think" width={96} />
       <Text variant="hand" style={styles.title} accessibilityRole="header">
         {denied ? "can't hear you..." : 'mic trouble...'}
       </Text>

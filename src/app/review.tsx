@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { SummarySection } from '@/components/lore';
 import { Button, Card, Chip, ConfirmDialog, IconButton, Screen, Text } from '@/components/ui';
 import type { Draft } from '@/data/types';
+import { deleteAudioFiles } from '@/lib/audioFiles';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
 
@@ -35,14 +36,21 @@ export default function Review() {
     router.replace({ pathname: '/saved', params: { id: entry.id } });
   };
 
+  // Nothing exists server-side until Save, so discarding only has to drop the draft and its recording.
+  const dropRecording = () => deleteAudioFiles([draft?.audioUri]);
+
   const discard = () => {
-    if (!dirty) setDraft(null);
+    if (!dirty) {
+      dropRecording();
+      setDraft(null);
+    }
     router.dismissTo('/(tabs)');
   };
 
   const confirmDiscard = () => {
     const leave = blocked;
     setBlocked(null);
+    dropRecording();
     setDraft(null);
     allowLeaving();
     leave?.();

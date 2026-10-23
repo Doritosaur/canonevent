@@ -73,11 +73,11 @@ export const darkPalette: Palette = {
   textMuted: '#A4AEB9',
   textFaint: '#566170',
 
-  accent: '#63FAFD',
-  accentPressed: '#3DDFE3',
-  accentSoft: 'rgba(99, 250, 253, 0.12)',
-  accentText: '#63FAFD',
-  wave: '#14E1EC',
+  accent: '#5CEEF4',
+  accentPressed: '#3CD2D9',
+  accentSoft: 'rgba(92, 238, 244, 0.12)',
+  accentText: '#5CEEF4',
+  wave: '#5CEEF4',
   onAccent: '#031314',
 
   danger: '#F04462',
@@ -126,13 +126,13 @@ export const lightPalette: Palette = {
   textMuted: '#556275',
   textFaint: '#5F6B7C',
 
-  // The brand cyan is the same in both themes. Only cyan *text* is darkened (it can't be read on white).
-  accent: '#63FAFD',
-  accentPressed: '#3DDFE3',
-  accentSoft: 'rgba(99, 250, 253, 0.25)',
-  accentText: '#007A84',
-  wave: '#14E1EC',
-  onAccent: '#06303A',
+  // Brand teal for light theme; dark theme uses the brighter #5CEEF4.
+  accent: '#087F8C',
+  accentPressed: '#066873',
+  accentSoft: 'rgba(8, 127, 140, 0.14)',
+  accentText: '#087F8C',
+  wave: '#087F8C',
+  onAccent: '#FFFFFF',
 
   // Each is at least 5:1 against white (as a fill under white text, or as text on white).
   danger: '#C81E3A',

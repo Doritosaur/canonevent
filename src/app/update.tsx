@@ -1,10 +1,13 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Mascot, MicProblem, RecorderPanel } from '@/components/lore';
-import { ArtBoard, Icon, IconButton, Screen, Text } from '@/components/ui';
+import { MicProblem, RecorderPanel } from '@/components/lore';
+import { ArtBoard, Icon, IconButton, Screen, Text, useToast } from '@/components/ui';
 import { useRecorder } from '@/hooks/useRecorder';
+import { deleteAudioFiles } from '@/lib/audioFiles';
 import { formatElapsed } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
+import { isEmptyTake } from '@/lib/recording';
 import { useLore } from '@/state/lore';
 import { spacing, useTheme } from '@/theme';
 
@@ -14,20 +17,29 @@ export default function UpdateOutcome() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getEntry } = useLore();
   const rec = useRecorder();
+  const toast = useToast();
   const entry = getEntry(id);
 
   if (!entry) return <Redirect href="/(tabs)" />;
 
+  const entryHref = { pathname: '/entry/[id]', params: { id: entry.id } } as const;
   const problem = rec.status === 'denied' || rec.status === 'error';
   const stop = async () => {
     const result = await rec.stop();
-    router.replace({ pathname: '/updated', params: { id: entry.id, duration: String(result.seconds) } });
+    // Nothing audible: don't transcribe it, just let them go again.
+    if (!result.uri || isEmptyTake(result)) {
+      deleteAudioFiles([result.uri]);
+      toast.show({ message: 'I didn’t catch anything. Try again.' });
+      void rec.retry();
+      return;
+    }
+    router.replace({ pathname: '/updated', params: { id: entry.id, uri: result.uri } });
   };
 
   return (
     <Screen style={styles.screen}>
       <View style={styles.header}>
-        <IconButton icon="close" label="Cancel" size={30} onPress={() => router.back()} />
+        <IconButton icon="close" label="Cancel" size={30} onPress={() => goBack(entryHref)} />
         <Text variant="heading" accessibilityRole="header" style={styles.headerTitle}>
           Update outcome
         </Text>
@@ -39,7 +51,7 @@ export default function UpdateOutcome() {
           kind={rec.status === 'denied' ? 'denied' : 'error'}
           canAskAgain={rec.canAskAgain}
           onRetry={rec.retry}
-          onClose={() => router.back()}
+          onClose={() => goBack(entryHref)}
         />
       ) : (
         <>
@@ -57,9 +69,6 @@ export default function UpdateOutcome() {
                 go?
               </Text>
             </Text>
-            <View style={styles.mascot}>
-              <Mascot pose="lean" width={124} />
-            </View>
           </ArtBoard>
 
           <View style={styles.panel}>
@@ -84,6 +93,5 @@ const styles = StyleSheet.create({
   elapsed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, marginTop: spacing.md },
   elapsedText: { fontSize: 18 },
   title: { position: 'absolute', left: 58, top: 24, fontSize: 48, lineHeight: 52, transform: [{ rotate: '-8deg' }] },
-  mascot: { position: 'absolute', left: 24, top: 144 },
   panel: { flex: 1, justifyContent: 'center', paddingBottom: spacing.lg },
 });

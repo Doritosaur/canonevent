@@ -15,12 +15,15 @@ const TONE_KEY = {
 
 export type InsightCardProps = {
   text: string;
-  /** e.g. "7 similar decisions" */
+  /** e.g. "Bought a GPU · Mar 12, 2024" */
   meta: string;
   tone: InsightTone;
   icon: IconName;
   onPress?: () => void;
 };
+
+/** Longer notes are cut with an ellipsis so the cards stay a similar height; the full text is on the entry. */
+const TEXT_LINES = 3;
 
 /** Coloured highlight card. Its text is always white (`onTone`), whichever theme is active. */
 export function InsightCard({ text, meta, tone, icon, onPress }: InsightCardProps) {
@@ -36,10 +39,10 @@ export function InsightCard({ text, meta, tone, icon, onPress }: InsightCardProp
         <Icon name={icon} size={24} color={colors.onTone} />
       </View>
       <View style={styles.body}>
-        <Text variant="bodyStrong" color="onTone">
+        <Text variant="bodyStrong" color="onTone" numberOfLines={TEXT_LINES}>
           {text}
         </Text>
-        <Text variant="caption" color="onTone" style={styles.meta}>
+        <Text variant="caption" color="onTone" numberOfLines={1} style={styles.meta}>
           {meta}
         </Text>
       </View>

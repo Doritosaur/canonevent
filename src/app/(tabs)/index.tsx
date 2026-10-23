@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
 
-import { EntryCard, Mascot } from '@/components/lore';
+import { EntryCard } from '@/components/lore';
 import {
   ActionSheet,
   Button,
@@ -98,7 +98,6 @@ export default function Home() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Mascot pose="think" width={96} />
             <Text variant="heading" style={styles.emptyTitle}>
               {filtering ? 'No lore matches' : 'Nothing here yet'}
             </Text>

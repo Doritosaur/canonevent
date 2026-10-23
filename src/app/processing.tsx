@@ -2,10 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { Mascot, ProgressStep, Sparkle, type ProgressStepProps } from '@/components/lore';
+import { ProgressStep, Sparkle, type ProgressStepProps } from '@/components/lore';
 import { ArtBoard, Button, Card, IconButton, Screen, Text } from '@/components/ui';
+import type { Draft } from '@/data/types';
 import { stepStatus, useStepProgress } from '@/hooks/useStepProgress';
-import { analyzeRecording } from '@/services/ai';
+import { EmptyRecordingError, newMemoryId } from '@/lib/api';
+import { deleteAudioFiles } from '@/lib/audioFiles';
+import { analyzeRecording, type AnalysisStage } from '@/services/ai';
 import { useLore } from '@/state/lore';
 import { spacing } from '@/theme';
 
@@ -27,28 +30,65 @@ export default function Processing() {
   const compact = width < 360 || height < 700;
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
-  const done = useStepProgress(STEPS.length);
+  // True when the recording held nothing worth saving; retrying the same audio can't help.
+  const [empty, setEmpty] = useState(false);
+  const [result, setResult] = useState<Draft | null>(null);
+  // One id per screen: a retry re-sends the same memory instead of creating a duplicate.
+  const [memoryId] = useState(newMemoryId);
+  // Real progress: the first step waits for the transcript, the middle ones for the structuring.
+  const [stage, setStage] = useState<AnalysisStage | 'done'>('transcribing');
+  const [slow, setSlow] = useState(false);
+  const cap = stage === 'transcribing' ? 0 : stage === 'structuring' ? STEPS.length - 2 : STEPS.length;
+  const done = useStepProgress(STEPS.length, stage === 'done' ? 250 : 900, cap);
   const finished = done >= STEPS.length;
 
+  // Reassurance if the work drags on, so a long wait never looks like a hang.
   useEffect(() => {
-    if (!finished) return;
+    if (stage === 'done' || failed || empty) return;
+    const id = setTimeout(() => setSlow(true), 25_000);
+    return () => clearTimeout(id);
+  }, [stage, failed, empty]);
+
+  // Starts straight away; the step animation is just pacing and doesn't gate the work.
+  useEffect(() => {
     let cancelled = false;
-    analyzeRecording(Number(duration) || 1)
+    analyzeRecording({
+      uri: uri === '' ? undefined : uri,
+      durationSec: Number(duration) || 1,
+      memoryId,
+      onStage: (s) => {
+        if (!cancelled) setStage(s);
+      },
+    })
       .then((draft) => {
         if (cancelled) return;
-        setDraft({ ...draft, audioUri: uri === '' ? undefined : uri });
-        router.replace('/review');
+        setStage('done');
+        setResult(draft);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (error instanceof EmptyRecordingError) {
+          deleteAudioFiles([uri]);
+          setEmpty(true);
+        } else {
+          setFailed(true);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [finished, duration, uri, setDraft, attempt]);
+  }, [duration, uri, memoryId, attempt]);
+
+  useEffect(() => {
+    if (!finished || !result) return;
+    setDraft({ ...result, audioUri: uri === '' ? undefined : uri });
+    router.replace('/review');
+  }, [finished, result, uri, setDraft]);
 
   const retry = useCallback(() => {
     setFailed(false);
+    setSlow(false);
+    setStage('transcribing');
     setAttempt((n) => n + 1);
   }, []);
 
@@ -66,20 +106,35 @@ export default function Processing() {
         <View style={styles.sparkle}>
           <Sparkle size={30} twinkle />
         </View>
-        <View style={styles.laptop}>
-          <Mascot pose="laptop" width={108} />
-        </View>
       </ArtBoard>
 
-      {failed ? (
+      {empty ? (
+        <View style={styles.padded}>
+          <Card style={styles.error} accessibilityLiveRegion="polite">
+            <Text variant="heading">I couldn&rsquo;t hear anything</Text>
+            <Text color="textMuted">
+              There wasn&rsquo;t enough speech in that recording to turn into lore, so nothing was saved.
+            </Text>
+            <Button label="Record again" icon="mic" onPress={() => router.replace('/record')} />
+            <Button label="Close" variant="secondary" onPress={leave} />
+          </Card>
+        </View>
+      ) : failed ? (
         <View style={styles.padded}>
           <Card style={styles.error} accessibilityLiveRegion="polite">
             <Text variant="heading">That one got away</Text>
             <Text color="textMuted">
-              We couldn&rsquo;t turn your recording into lore. Your audio is safe; give it another go.
+              We couldn&rsquo;t turn your recording into lore. Your audio is still on this device; give it another go.
             </Text>
             <Button label="Try again" onPress={retry} />
-            <Button label="Discard" variant="secondary" onPress={leave} />
+            <Button
+              label="Discard"
+              variant="secondary"
+              onPress={() => {
+                deleteAudioFiles([uri]);
+                leave();
+              }}
+            />
           </Card>
         </View>
       ) : (
@@ -87,6 +142,11 @@ export default function Processing() {
           {STEPS.map((s, i) => (
             <ProgressStep key={s.label} {...s} compact={compact} status={stepStatus(i, done)} enterDelay={i * 90} />
           ))}
+          {slow && (
+            <Text variant="caption" color="textMuted" style={styles.slow} accessibilityLiveRegion="polite">
+              This one&rsquo;s taking a little longer than usual. Hang tight.
+            </Text>
+          )}
         </View>
       )}
 
@@ -97,9 +157,6 @@ export default function Processing() {
           <Text variant="note" color="accent" style={styles.note}>
             this won&rsquo;t{'\n'}take long...
           </Text>
-          <View style={styles.lying}>
-            <Mascot pose="lying" width={176} />
-          </View>
         </ArtBoard>
         )}
       </View>
@@ -112,11 +169,10 @@ const styles = StyleSheet.create({
   hero: { marginBottom: spacing.sm },
   title: { position: 'absolute', left: 52, top: 10, fontSize: 35, lineHeight: 38, transform: [{ rotate: '-8deg' }] },
   sparkle: { position: 'absolute', left: 280, top: 0 },
-  laptop: { position: 'absolute', left: 262, top: 42 },
   steps: { gap: 6, paddingHorizontal: 20 },
+  slow: { textAlign: 'center', marginTop: spacing.md },
   padded: { paddingHorizontal: 28 },
   error: { gap: spacing.md },
   footer: { flex: 1, justifyContent: 'flex-end' },
   note: { position: 'absolute', left: 34, top: 54, fontSize: 28, lineHeight: 32, transform: [{ rotate: '-8deg' }] },
-  lying: { position: 'absolute', left: 204, top: 56 },
 });

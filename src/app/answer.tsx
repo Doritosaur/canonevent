@@ -1,12 +1,14 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { AudioBar, EntryCard, RelatedRow } from '@/components/lore';
+import { EntryCard, RelatedRow } from '@/components/lore';
 import { Button, Card, IconButton, Screen, SegmentedControl, Text } from '@/components/ui';
 import type { PastSelfAnswer } from '@/data/types';
+import { newMemoryId } from '@/lib/api';
 import { formatDate } from '@/lib/format';
-import { askPastSelf } from '@/services/ai';
+import { goBack } from '@/lib/navigation';
+import { askPastSelf, openPastAnswer } from '@/services/ai';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
 
@@ -17,19 +19,33 @@ type Tab = (typeof TABS)[number];
 export default function Answer() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { q } = useLocalSearchParams<{ q?: string }>();
-  const { entries } = useLore();
+  // `q` is a new question; `c` reopens one that was asked before, exactly as it was answered.
+  const { q, c } = useLocalSearchParams<{ q?: string; c?: string }>();
   const [tab, setTab] = useState<Tab>('Answer');
   const [result, setResult] = useState<PastSelfAnswer | null>(null);
-  const question = q ?? 'Should I make this decision?';
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  // The id a new question is saved under. Retrying reuses it, so the answer is never asked for twice.
+  const [conversationId] = useState(newMemoryId);
 
   useEffect(() => {
     let cancelled = false;
-    void askPastSelf(question, entries).then((r) => !cancelled && setResult(r));
+    const entries = useLore.getState().entries;
+    const load = c ? openPastAnswer(c, entries) : askPastSelf(q ?? '', conversationId, entries);
+    load
+      .then((r) => !cancelled && setResult(r))
+      .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [question, entries]);
+  }, [q, c, conversationId, attempt]);
+
+  const retry = () => {
+    setFailed(false);
+    setAttempt((n) => n + 1);
+  };
+
+  if (!q && !c) return <Redirect href="/(tabs)/ask" />;
 
   const open = (id: string) => router.push({ pathname: '/entry/[id]', params: { id } });
   const askAgain = () => router.dismissTo('/(tabs)/ask');
@@ -37,16 +53,26 @@ export default function Answer() {
   return (
     <Screen scroll style={styles.content}>
       <View style={styles.back}>
-        <IconButton icon="close" label="Close" size={30} onPress={() => router.back()} />
+        <IconButton icon="close" label="Close" size={30} onPress={() => goBack('/(tabs)/ask')} />
       </View>
       <Text variant="heading" accessibilityRole="header" style={styles.title}>
         Here&rsquo;s what your past self says…
       </Text>
 
-      <AudioBar durationSec={48} />
+      <Text variant="caption" color="textMuted">
+        You asked: {result?.question ?? q}
+      </Text>
       <SegmentedControl options={TABS} value={tab} onChange={setTab} />
 
-      {!result ? (
+      {failed ? (
+        <Card style={styles.answer} accessibilityLiveRegion="polite">
+          <Text variant="heading">I couldn&rsquo;t get an answer</Text>
+          <Text color="textMuted" style={styles.failedBody}>
+            Your lore couldn&rsquo;t be reached just now. Nothing was lost; try again in a moment.
+          </Text>
+          <Button label="Try again" onPress={retry} />
+        </Card>
+      ) : !result ? (
         <ActivityIndicator color={colors.accent} style={styles.loading} />
       ) : (
         <>
@@ -100,7 +126,7 @@ export default function Answer() {
               <Text variant="label" color="accent">
                 You asked
               </Text>
-              <Text color="textSoft">{question}</Text>
+              <Text color="textSoft">{result.question}</Text>
               <Text variant="label" color="accent">
                 Past you answered
               </Text>
@@ -129,6 +155,7 @@ const makeStyles = (colors: Palette) =>
   bullet: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.text },
   related: { marginTop: spacing.sm, fontSize: 20 },
+  failedBody: { marginVertical: spacing.md },
   transcript: { gap: spacing.sm },
   cta: { marginTop: spacing.sm, minHeight: 62, borderRadius: radius.button },
 });

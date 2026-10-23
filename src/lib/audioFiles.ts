@@ -1,6 +1,16 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+/** Whether a local recording can still be played. Web blob URLs can't be checked, so they count as gone. */
+export function audioFileExists(uri: string | undefined): boolean {
+  if (!uri || Platform.OS === 'web') return false;
+  try {
+    return new File(uri).exists;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Deletes recordings from the device. Failures are ignored on purpose: a file that is already gone
  * (or, on web, a browser blob that expires on its own) should never block deleting the user's data.

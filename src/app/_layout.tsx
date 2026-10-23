@@ -8,11 +8,13 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastProvider } from '@/components/ui';
 import { useWebSelectionStyle } from '@/hooks/useWebSelectionStyle';
+import { supabase } from '@/lib/supabase';
 import { useLore } from '@/state/lore';
 import { ThemeProvider, useTheme } from '@/theme';
 
@@ -24,9 +26,23 @@ function ThemedStatusBar() {
   return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
 }
 
+/** Widest the UI is allowed to grow (tablet-ish); on larger screens the app stays a centred column. */
+const MAX_APP_WIDTH = 560;
+
+function FrameBackdrop({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, alignItems: 'center', backgroundColor: colors.background }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: MAX_APP_WIDTH }}>{children}</View>
+    </View>
+  );
+}
+
 function Navigator() {
   const { colors } = useTheme();
   const ready = useLore((s) => s.ready);
+  const hasOnboarded = useLore((s) => s.hasOnboarded);
+  const syncEntries = useLore((s) => s.syncEntries);
   useWebSelectionStyle();
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
@@ -36,6 +52,17 @@ function Navigator() {
     PatrickHand_400Regular,
   });
   const fontsDone = fontsLoaded || !!fontError;
+
+  // Pull the user's memories once the stored session has loaded, and again whenever it signs in.
+  useEffect(() => {
+    if (!ready || !hasOnboarded) return;
+    const sync = () => void syncEntries().catch(() => {});
+    sync();
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') sync();
+    });
+    return () => data.subscription.unsubscribe();
+  }, [ready, hasOnboarded, syncEntries]);
 
   useEffect(() => {
     if (fontsDone && ready) SplashScreen.hideAsync().catch(() => {});
@@ -54,6 +81,7 @@ function Navigator() {
       <Stack.Screen name="record" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="update" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="answer" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="entry/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="processing" options={{ gestureEnabled: false }} />
       <Stack.Screen name="saved" options={{ gestureEnabled: false }} />
@@ -67,9 +95,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <ThemedStatusBar />
-        <ToastProvider>
-          <Navigator />
-        </ToastProvider>
+        <FrameBackdrop>
+          <ToastProvider>
+            <Navigator />
+          </ToastProvider>
+        </FrameBackdrop>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -36,6 +36,14 @@ export type Draft = {
   durationSec: number;
   /** Local file of the voice recording, when one was captured. */
   audioUri?: string;
+  /** Client-generated id the memory is saved under (makes saving retryable without duplicates). */
+  memoryId?: string;
+  /** True once the recording is in storage, so it can be played on any device or after a reload. */
+  audioStored?: boolean;
+  /** Language the transcriber detected, e.g. hi-IN. */
+  language?: string;
+  /** True when structuring the transcript failed and the fields above are placeholders, not extracted. */
+  fieldsAreFallback?: boolean;
 };
 
 export type Entry = Draft & {
@@ -48,6 +56,9 @@ export type Entry = Draft & {
 };
 
 export type PastSelfAnswer = {
+  /** Id the question is saved under, so it can be reopened from the recent list. */
+  conversationId: string;
+  question: string;
   answer: string;
   considerations: string[];
   related: { entry: Entry; reason: string }[];

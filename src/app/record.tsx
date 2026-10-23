@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { Mascot, MicProblem, RecorderPanel } from '@/components/lore';
-import { ArtBoard, ConfirmDialog, IconButton, Screen, Text } from '@/components/ui';
+import { MicProblem, RecorderPanel } from '@/components/lore';
+import { ArtBoard, ConfirmDialog, IconButton, Screen, Text, useToast } from '@/components/ui';
 import { useRecorder } from '@/hooks/useRecorder';
 import { deleteAudioFiles } from '@/lib/audioFiles';
+import { isEmptyTake } from '@/lib/recording';
 import { spacing, useTheme } from '@/theme';
 
 const close = () => router.dismissTo('/(tabs)');
@@ -15,6 +16,7 @@ const close = () => router.dismissTo('/(tabs)');
 export default function Record() {
   const { colors } = useTheme();
   const rec = useRecorder();
+  const toast = useToast();
   const problem = rec.status === 'denied' || rec.status === 'error';
   // Set once the user has chosen to leave, so the guard below lets the navigation through.
   const [leaving, setLeaving] = useState(false);
@@ -35,6 +37,14 @@ export default function Record() {
   const stop = async () => {
     setLeaving(true);
     const result = await rec.stop();
+    // Nothing audible was captured: don't upload it or pay to transcribe it, just let them go again.
+    if (!result.uri || isEmptyTake(result)) {
+      deleteAudioFiles([result.uri]);
+      toast.show({ message: 'I didn’t catch anything. Try again.' });
+      setLeaving(false);
+      void rec.retry();
+      return;
+    }
     router.replace({
       pathname: '/processing',
       params: { duration: String(result.seconds), uri: result.uri ?? '' },
@@ -73,9 +83,6 @@ export default function Record() {
                 strokeLinecap="round"
               />
             </Svg>
-            <View style={styles.mascot}>
-              <Mascot pose="cat" width={104} />
-            </View>
           </ArtBoard>
 
           <View style={styles.panel}>
@@ -108,6 +115,5 @@ const styles = StyleSheet.create({
   title: { position: 'absolute', left: 46, top: 54, fontSize: 54, lineHeight: 58, transform: [{ rotate: '-12deg' }] },
   note: { position: 'absolute', left: 250, top: 4, fontSize: 25, lineHeight: 28, transform: [{ rotate: '-8deg' }] },
   curve: { position: 'absolute', left: 308, top: 98 },
-  mascot: { position: 'absolute', left: 272, top: 138 },
   panel: { flex: 1, justifyContent: 'center', paddingBottom: spacing.lg },
 });
