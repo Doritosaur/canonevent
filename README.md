@@ -16,7 +16,7 @@ past self a question and get an answer drawn only from your own memories. It run
 
 ## Run it
 
-Needs Node.js (developed on 24) and the backend running (see [`../memory-backend/README.md`](../memory-backend/README.md); `scripts/dev.ps1` starts all of it).
+Needs Node.js (developed on 24) and the backend running (see [`../memory-backend/README.md`](../memory-backend/README.md); `scripts/dev.sh` starts all of it).
 
 ```sh
 npm install

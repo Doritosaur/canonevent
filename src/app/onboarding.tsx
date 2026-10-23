@@ -46,7 +46,10 @@ const SLIDES = [
     subtitle: 'Spot your patterns, then ask what\npast you would say.',
   },
 ] as const;
-
+/** Upper bound for the size factor, so tablets get bigger type and art without it ballooning. */
+const MAX_SCALE = 1.6;
+/** Widest the content column grows; on tablets it centres instead of stretching edge to edge. */
+const MAX_CONTENT_WIDTH = 560;
 
 /** Screen 1: Onboarding. A short, swipeable intro with Google sign-in, then name and photo setup. */
 export default function Onboarding() {
@@ -54,10 +57,16 @@ export default function Onboarding() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { hasOnboarded, profile, setProfile, completeOnboarding } = useLore();
   const { width, height } = useWindowDimensions();
-  /** 1 on a normal phone, smaller on compact screens so the copy and button always fit. */
-  const k = Math.min(1, width / 390, height / 780);
+  /** 1 on a normal phone, smaller on compact screens, and larger (capped) on tablets. */
+  const k = Math.min(MAX_SCALE, width / 390, height / 780);
+  /** Tablets get a vertically centred block instead of art floating in a tall empty pager. */
+  const isLarge = width >= 600;
+  const largePagerHeight = Math.round(500 * k);
   const [index, setIndex] = useState(0);
   const [pagerHeight, setPagerHeight] = useState(0);
+  /** Measured pager width; the window can be wider than the area the screen is rendered in (e.g. on web). */
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const pageWidth = measuredWidth || width;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<(typeof SLIDES)[number]>>(null);
@@ -109,12 +118,12 @@ export default function Onboarding() {
 
   // Track the page live while dragging; momentum-end alone doesn't fire on every drag release.
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.min(SLIDES.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width)));
+    const next = Math.min(SLIDES.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.x / pageWidth)));
     setIndex((prev) => (prev === next ? prev : next));
   };
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={[styles.screen, isLarge && styles.screenLarge]}>
       <FlatList
         ref={list}
         data={SLIDES}
@@ -124,11 +133,14 @@ export default function Onboarding() {
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}
-        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-        style={styles.pager}
+        onLayout={(e) => {
+          setPagerHeight(e.nativeEvent.layout.height);
+          setMeasuredWidth(e.nativeEvent.layout.width);
+        }}
+        getItemLayout={(_, i) => ({ length: pageWidth, offset: pageWidth * i, index: i })}
+        style={[styles.pager, isLarge && { flexGrow: 0, flexShrink: 0, flexBasis: largePagerHeight, height: largePagerHeight }]}
         renderItem={({ item }) => (
-          <View style={{ width, height: pagerHeight }}>
+          <View style={{ width: pageWidth, height: isLarge ? largePagerHeight : pagerHeight }}>
             <View style={styles.art}><SlideArt slide={item.key} /></View>
             <View style={styles.copy}>
               <Text
@@ -193,8 +205,8 @@ function SlideArt({ slide }: { slide: (typeof SLIDES)[number]['key'] }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { width, height } = useWindowDimensions();
-  /** Same shrink factor as the screen copy, so art and text scale down together on small phones. */
-  const k = Math.min(1, width / 390, height / 780);
+  /** Same factor as the screen copy, so art and text scale together. */
+  const k = Math.min(MAX_SCALE, width / 390, height / 780);
   return (
     <View style={styles.artWrap}>
       <Image
@@ -223,14 +235,15 @@ function SlideArt({ slide }: { slide: (typeof SLIDES)[number]['key'] }) {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   screen: { paddingHorizontal: 0 },
+  screenLarge: { justifyContent: 'center' },
   pager: { flex: 1 },
   art: { flex: 1, minHeight: 0, overflow: 'hidden' },
-  copy: { alignItems: 'center', paddingHorizontal: 22, paddingTop: spacing.sm },
+  copy: { alignItems: 'center', paddingHorizontal: 22, paddingTop: spacing.sm, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   subtitle: { textAlign: 'center', marginTop: spacing.xs },
-  footer: { paddingHorizontal: 22, alignItems: 'center', paddingBottom: spacing.sm },
+  footer: { paddingHorizontal: 22, alignItems: 'center', paddingBottom: spacing.sm, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   button: { alignSelf: 'stretch', borderRadius: radius.button },
   error: { textAlign: 'center', marginTop: spacing.md },
-  setup: { paddingHorizontal: 22, gap: spacing.xl },
+  setup: { paddingHorizontal: 22, gap: spacing.xl, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   setupHeader: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.xl },
   setupTitle: { fontSize: 48, lineHeight: 54, textAlign: 'center' },
   setupSubtitle: { textAlign: 'center', fontSize: 18, lineHeight: 26 },
@@ -238,7 +251,7 @@ const makeStyles = (colors: Palette) =>
   dots: { flexDirection: 'row', gap: 15, marginTop: spacing.xl },
   dot: { width: 7, height: 7, borderRadius: radius.pill, backgroundColor: colors.dot },
   dotActive: { backgroundColor: colors.accent },
-  artWrap: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  artWrap: { flex: 1, paddingHorizontal: 32, justifyContent: 'center', width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   artImage: { flex: 1, minHeight: 0, width: '100%', maxWidth: 280, maxHeight: 240, alignSelf: 'center' },
   sparkle: { position: 'absolute', right: 44, bottom: 24 },
   aside: { position: 'absolute', left: 28, top: 36, fontSize: 40, lineHeight: 42, transform: [{ rotate: '-8deg' }] },

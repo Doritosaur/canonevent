@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 
 import { EntryCard } from '@/components/lore';
 import {
@@ -16,7 +16,7 @@ import {
 import { CATEGORIES, type Category, type Entry } from '@/data/types';
 import { formatDate, formatMonth } from '@/lib/format';
 import { useLore } from '@/state/lore';
-import { spacing } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 
 type Filter = 'All' | Category;
 const FILTERS: readonly Filter[] = ['All', ...CATEGORIES];
@@ -25,7 +25,9 @@ type Section = { title: string; data: Entry[] };
 
 /** Screen 2: Home timeline, grouped by month. */
 export default function Home() {
-  const { entries, deleteEntry, restoreEntry } = useLore();
+  const { entries, deleteEntry, restoreEntry, syncEntries } = useLore();
+  const { colors } = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -49,6 +51,17 @@ export default function Home() {
     }
     return groups;
   }, [entries, query, filter]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await syncEntries();
+    } catch {
+      toast.show({ message: 'Couldn’t refresh. Check your connection.' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [syncEntries, toast]);
 
   const remove = (entry: Entry) => {
     const removed = deleteEntry(entry.id);
@@ -88,6 +101,14 @@ export default function Home() {
         keyExtractor={(e) => e.id}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={Separator}
