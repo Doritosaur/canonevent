@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/state/lore';
 
@@ -31,8 +33,31 @@ const loadGoogle = async () => {
   return google;
 };
 
+/**
+ * The native Google module has no web implementation, so web uses Supabase's OAuth redirect.
+ * The page navigates away to Google and back; `profileFromSession` picks the result up on return.
+ */
+async function signInWithGoogleWeb(): Promise<SignInResult> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}/onboarding` },
+  });
+  if (error) return { status: 'error', message: 'Couldn’t sign in with Google. Try again.' };
+  return { status: 'cancelled' };
+}
+
+/** The signed-in Google user from the stored session, if any (used after the web OAuth redirect). */
+export async function profileFromSession(): Promise<Profile | null> {
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user?.email || user.app_metadata.provider !== 'google') return null;
+  const meta: Record<string, string | undefined> = user.user_metadata;
+  return { name: meta.full_name ?? meta.name ?? '', email: user.email, photoUri: meta.avatar_url ?? meta.picture };
+}
+
 /** Opens the Google account picker and maps the result to our profile shape. */
 export async function signInWithGoogle(): Promise<SignInResult> {
+  if (Platform.OS === 'web') return signInWithGoogleWeb();
   if (DEV_SIGN_IN) {
     return signInDevUser();
   }
@@ -65,7 +90,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
 
 export function signOutOfGoogle(): void {
   void supabase.auth.signOut();
-  if (DEV_SIGN_IN) return;
+  if (DEV_SIGN_IN || Platform.OS === 'web') return;
   loadGoogle()
     .then(({ GoogleSignin }) => GoogleSignin.signOut())
     .catch(() => {});

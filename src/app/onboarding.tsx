@@ -1,8 +1,9 @@
 import { Image, type ImageSource } from 'expo-image';
 import { Redirect, router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -13,7 +14,7 @@ import {
 
 import { ProfileEditor, Sparkle } from '@/components/lore';
 import { Button, Screen, Text } from '@/components/ui';
-import { signInWithGoogle } from '@/lib/googleAuth';
+import { profileFromSession, signInWithGoogle } from '@/lib/googleAuth';
 import { useLore } from '@/state/lore';
 import { type Palette, radius, spacing, useTheme } from '@/theme';
 
@@ -70,6 +71,12 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<(typeof SLIDES)[number]>>(null);
+
+  // On web, Google sign-in redirects away and back; resume with the session it left behind.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || profile) return;
+    void profileFromSession().then((p) => p && setProfile(p));
+  }, [profile, setProfile]);
 
   if (hasOnboarded) return <Redirect href="/(tabs)" />;
 
